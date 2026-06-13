@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AitherTwin | Digital Twin Dashboard</title>
+
+  <!-- Plotly for charts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.0/plotly.min.js"></script>
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+  <header class="topbar">
+    <h1>⚙️ AitherTwin — Virtual Factory Dashboard</h1>
+    <div class="status" id="health-status">Checking system status...</div>
+  </header>
+
+  <main class="grid">
+
+    <!-- Factory Layout -->
+    <section class="card wide">
+      <h2>Virtual Factory Layout</h2>
+      <div id="factory-layout" class="plot"></div>
+    </section>
+
+    <!-- Machine Predictions -->
+    <section class="card">
+      <h2>Machine Predictions</h2>
+      <div id="predictions-list"></div>
+    </section>
+
+    <!-- Energy Consumption -->
+    <section class="card wide">
+      <h2>Energy Consumption</h2>
+      <div id="energy-chart" class="plot"></div>
+    </section>
+
+    <!-- Recommendations -->
+    <section class="card">
+      <h2>Recommendations</h2>
+      <div id="recommendations-list"></div>
+    </section>
+
+    <!-- Financial Impact -->
+    <section class="card">
+      <h2>Financial Impact Summary</h2>
+      <div id="financial-summary" class="financial-grid"></div>
+    </section>
+
+  </main>
+
+  <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+</body>
+</html>
