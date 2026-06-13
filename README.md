@@ -6,7 +6,8 @@
 
 ```bash
 pip install -r requirements.txt
-python app.py
+python backend/models/data_generator.py
+python backend/models/app.py
 ```
 
 Server runs at `http://localhost:5000`
