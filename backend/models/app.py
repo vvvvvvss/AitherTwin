@@ -2,6 +2,12 @@ from flask import Flask, jsonify, request, render_template
 from database import init_db, get_machines, get_predictions, get_energy_data, save_simulation
 from simulator import run_schedule_simulation
 from recommender import generate_recommendations
+from live_simulator import (
+    get_live_machines,
+    get_live_predictions,
+    get_live_energy,
+    get_live_recommendations,
+)
 
 app = Flask(
     __name__,
@@ -21,24 +27,27 @@ def dashboard():
 
 
 # ----------------------------
-# API ROUTES
+# API ROUTES (Live / Dynamic)
 # ----------------------------
 
 @app.route("/api/machines", methods=["GET"])
 def machines():
-    data = get_machines()
+    """Return live machine states with simulated sensor changes."""
+    data = get_live_machines()
     return jsonify(data)
 
 
 @app.route("/api/predictions", methods=["GET"])
 def predictions():
-    data = get_predictions()
+    """Return live predictions based on current sensor state."""
+    data = get_live_predictions()
     return jsonify(data)
 
 
 @app.route("/api/energy", methods=["GET"])
 def energy():
-    data = get_energy_data()
+    """Return live energy data with rolling updates."""
+    data = get_live_energy()
     return jsonify(data)
 
 
@@ -62,13 +71,14 @@ def simulate():
 
 @app.route("/api/recommendations", methods=["GET"])
 def recommendations():
-    data = generate_recommendations()
+    """Return live recommendations based on current state."""
+    data = get_live_recommendations()
     return jsonify(data)
 
 
 @app.route("/api/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok"})
+    return jsonify({"status": "ok", "timestamp": __import__('datetime').datetime.now().isoformat()})
 
 
 if __name__ == "__main__":

@@ -1,6 +1,24 @@
-// ====== AitherTwin Dashboard Frontend Logic ======
-// This file calls all 5 backend API endpoints and renders the results.
+// ====== AitherTwin Dashboard Frontend Logic (Dynamic) ======
+// This file calls all 5 backend API endpoints and renders live updates.
 const API_BASE = ""; // same origin, since Flask serves both page + API
+
+// Config for live updates
+const REFRESH_INTERVAL_MS = 5000; // Update every 5 seconds
+let lastUpdateTime = null;
+let updateCounter = 0;
+
+// -------------------- 0. UPDATE INDICATOR --------------------
+function updateTimestamp() {
+  const el = document.getElementById("last-update");
+  if (!el) return;
+  const now = new Date().toLocaleTimeString();
+  el.textContent = `Last update: ${now}`;
+  el.style.opacity = "1";
+  // Fade out after 3 seconds
+  setTimeout(() => {
+    el.style.opacity = "0.5";
+  }, 3000);
+}
 
 // -------------------- 1. HEALTH CHECK --------------------
 async function checkHealth() {
@@ -9,35 +27,34 @@ async function checkHealth() {
     const res = await fetch(`${API_BASE}/api/health`);
     const data = await res.json();
     el.textContent = "System Online ✅ " + (data.status || data.message || "");
+    el.classList.remove("error");
     el.classList.add("ok");
   } catch (err) {
     el.textContent = "Backend not reachable ❌";
+    el.classList.remove("ok");
     el.classList.add("error");
     console.error("Health check failed:", err);
   }
 }
 
-// -------------------- 2. FACTORY LAYOUT (Plotly) --------------------
+// -------------------- 2. FACTORY LAYOUT (Plotly - Live) --------------------
 async function loadFactoryLayout() {
   try {
     const res = await fetch(`${API_BASE}/api/machines`);
     const data = await res.json();
 
-    // Expecting something like:
-    // { machines: [ {id, name, x, y, status}, ... ] }
-    // Adjust "machines" key below if your backend returns a plain array.
     const machines = data.machines || data;
 
     const x = machines.map(m => m.x ?? Math.random() * 10);
     const y = machines.map(m => m.y ?? Math.random() * 10);
-    const labels = machines.map(m => m.name || m.id || "Machine");
+    const labels = machines.map(m => `${m.name || m.id}\n${m.status}`);
     const statuses = machines.map(m => m.status || "normal");
 
-    // Color-code by status
+    // Color-code by status with live updates
     const colors = statuses.map(s => {
-      if (s.toLowerCase().includes("fault") || s.toLowerCase().includes("critical")) return "#f44336";
-      if (s.toLowerCase().includes("warn")) return "#ffb300";
-      return "#4caf50";
+      if (s.toLowerCase().includes("critical")) return "#f44336"; // Red for critical
+      if (s.toLowerCase().includes("warning")) return "#ffb300";   // Orange for warning
+      return "#4caf50"; // Green for running
     });
 
     const trace = {
@@ -47,7 +64,13 @@ async function loadFactoryLayout() {
       mode: "markers+text",
       type: "scatter",
       textposition: "top center",
-      marker: { size: 22, color: colors, line: { width: 2, color: "#fff" } }
+      marker: { 
+        size: 24, 
+        color: colors, 
+        line: { width: 2, color: "#fff" },
+        opacity: 0.8
+      },
+      hovertemplate: "<b>%{text}</b><extra></extra>",
     };
 
     const layout = {
@@ -56,7 +79,8 @@ async function loadFactoryLayout() {
       font: { color: "#e6e6e6" },
       xaxis: { title: "Factory X (m)", gridcolor: "#2a2f3a" },
       yaxis: { title: "Factory Y (m)", gridcolor: "#2a2f3a" },
-      margin: { t: 20 }
+      margin: { t: 20 },
+      title: { text: "🏭 Factory Layout (Live)", font: { size: 16 } }
     };
 
     Plotly.newPlot("factory-layout", [trace], layout, { responsive: true });
@@ -67,26 +91,40 @@ async function loadFactoryLayout() {
   }
 }
 
-// -------------------- 3. PREDICTIONS --------------------
+// -------------------- 3. PREDICTIONS (Live - Sorted) --------------------
 async function loadPredictions() {
   const container = document.getElementById("predictions-list");
   try {
     const res = await fetch(`${API_BASE}/api/predictions`);
     const data = await res.json();
 
-    // Expecting: { predictions: [ {machine, prediction, confidence, severity}, ... ] }
     const predictions = data.predictions || data;
 
     container.innerHTML = "";
     predictions.forEach(p => {
       const severity = (p.severity || p.status || "normal").toLowerCase();
       const div = document.createElement("div");
-      div.className = "pred-item " + (severity.includes("crit") ? "critical" : severity.includes("warn") ? "warning" : "");
+      
+      // Determine styling class
+      let styleClass = "pred-item";
+      if (severity.includes("critical")) styleClass += " critical";
+      else if (severity.includes("warning")) styleClass += " warning";
+      else styleClass += " normal";
+      
+      div.className = styleClass;
+      
+      // Live-updating failure countdown
+      const failureHrs = p.predicted_failure_in_hrs || 0;
+      const failureLabel = failureHrs > 0 ? `⏰ ${failureHrs} hrs` : "Stable";
+      
       div.innerHTML = `
-        <div class="machine-name">${p.machine || p.machine_id || "Machine"}</div>
+        <div class="pred-header">
+          <div class="machine-name">${p.machine || p.machine_id || "Machine"}</div>
+          <div class="severity-badge">${severity.toUpperCase()}</div>
+        </div>
         <div class="pred-detail">
-          Prediction: ${p.prediction || p.failure_type || "Normal operation"} <br>
-          Confidence: ${p.confidence ? (p.confidence * 100).toFixed(1) + "%" : "N/A"}
+          Risk: <strong>${((p.failure_probability || 0) * 100).toFixed(1)}%</strong> | ${failureLabel}<br>
+          Confidence: ${(p.confidence ? (p.confidence * 100).toFixed(0) : "N/A")}%
         </div>
       `;
       container.appendChild(div);
@@ -97,7 +135,7 @@ async function loadPredictions() {
   }
 }
 
-// -------------------- 4. ENERGY GRAPH (Plotly) --------------------
+// -------------------- 4. ENERGY GRAPH (Plotly - Live) --------------------
 async function loadEnergyChart() {
   try {
     const res = await fetch(`${API_BASE}/api/energy`);
@@ -109,7 +147,8 @@ async function loadEnergyChart() {
       type: "scatter",
       mode: "lines+markers",
       name: "Actual Energy",
-      line: { color: "#4dd0e1" }
+      line: { color: "#4dd0e1", width: 2 },
+      marker: { size: 6 }
     };
 
     const trace2 = {
@@ -118,17 +157,19 @@ async function loadEnergyChart() {
       type: "scatter",
       mode: "lines+markers",
       name: "Predicted Energy",
-      line: { color: "#ff9800" }
+      line: { color: "#ff9800", width: 2, dash: "dash" },
+      marker: { size: 6 }
     };
 
     const layout = {
       paper_bgcolor: "#161a23",
       plot_bgcolor: "#161a23",
       font: { color: "#e6e6e6" },
-      title: "Energy Consumption",
-      xaxis: { title: "Time", gridcolor: "#2a2f3a" },
+      title: { text: "⚡ Energy Consumption (Live)", font: { size: 14 } },
+      xaxis: { title: "Hour", gridcolor: "#2a2f3a" },
       yaxis: { title: "Energy (kWh)", gridcolor: "#2a2f3a" },
-      margin: { t: 20 }
+      margin: { t: 20, l: 50, r: 20, b: 40 },
+      hovermode: "x unified"
     };
 
     Plotly.newPlot(
@@ -145,7 +186,7 @@ async function loadEnergyChart() {
   }
 }
 
-// -------------------- 5. RECOMMENDATIONS --------------------
+// -------------------- 5. RECOMMENDATIONS (Live) --------------------
 async function loadRecommendations() {
   const container = document.getElementById("recommendations-list");
   try {
@@ -157,15 +198,24 @@ async function loadRecommendations() {
     container.innerHTML = "";
     recs.forEach(r => {
       const div = document.createElement("div");
-      div.className = "rec-item";
+      const priority = (r.priority || r.severity || "normal").toLowerCase();
+      
+      let priorityClass = "rec-item";
+      if (priority.includes("critical")) priorityClass += " critical";
+      else if (priority.includes("warning")) priorityClass += " warning";
+      
+      div.className = priorityClass;
       div.innerHTML = `
-        <div class="machine-name">${r.machine || r.machine_id || "General"}</div>
+        <div class="rec-header">
+          <div class="machine-name">${r.machine || r.machine_id || "Factory"}</div>
+          <div class="priority-label">${priority.toUpperCase()}</div>
+        </div>
         <div class="rec-detail">${r.recommendation || r.message || JSON.stringify(r)}</div>
       `;
       container.appendChild(div);
     });
 
-    // -------------------- 6. FINANCIAL SUMMARY (derived from recommendations) --------------------
+    // Update financial summary with latest data
     renderFinancialSummary(recs);
   } catch (err) {
     console.error("Failed to load recommendations:", err);
@@ -173,10 +223,10 @@ async function loadRecommendations() {
   }
 }
 
+// -------------------- 6. FINANCIAL SUMMARY (Derived) --------------------
 function renderFinancialSummary(recs) {
   const container = document.getElementById("financial-summary");
 
-  // Extract financial impact from nested structure
   let totalSavings = 0;
   let totalDowntime = 0;
 
@@ -190,25 +240,45 @@ function renderFinancialSummary(recs) {
   container.innerHTML = `
     <div class="fin-box">
       <div class="value">₹${totalSavings.toLocaleString("en-IN")}</div>
-      <div class="label">Estimated Cost Savings</div>
+      <div class="label">Est. Savings (24h)</div>
     </div>
     <div class="fin-box">
       <div class="value">${totalDowntime.toFixed(1)} hrs</div>
-      <div class="label">Downtime Avoided</div>
+      <div class="label">Downtime Prevented</div>
+    </div>
+    <div class="fin-box" style="grid-column: 1 / -1; text-align: center; opacity: 0.7; font-size: 0.9em;">
+      <div id="last-update">Last update: --:--:--</div>
     </div>
   `;
+  updateTimestamp();
 }
 
-// -------------------- INIT --------------------
-function loadAll() {
-  checkHealth();
-  loadFactoryLayout();
-  loadPredictions();
-  loadEnergyChart();
-  loadRecommendations();
+// -------------------- INIT & AUTO-REFRESH --------------------
+async function loadAll() {
+  updateCounter++;
+  console.log(`[Update #${updateCounter}] Refreshing all data...`);
+  
+  try {
+    // Check health first
+    await checkHealth();
+    
+    // Load all data in parallel
+    await Promise.all([
+      loadFactoryLayout(),
+      loadPredictions(),
+      loadEnergyChart(),
+      loadRecommendations()
+    ]);
+    
+    updateTimestamp();
+  } catch (err) {
+    console.error("Error in loadAll():", err);
+  }
 }
 
+// Initial load
+console.log("🚀 AitherTwin Dashboard - Starting...");
 loadAll();
 
-// Auto-refresh every 30 seconds to simulate live digital twin
-setInterval(loadAll, 30000);
+// Auto-refresh every REFRESH_INTERVAL_MS milliseconds
+setInterval(loadAll, REFRESH_INTERVAL_MS);

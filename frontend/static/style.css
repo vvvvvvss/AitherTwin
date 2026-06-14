@@ -79,29 +79,106 @@ body {
   padding: 10px 14px;
   margin-bottom: 10px;
   border-left: 4px solid #4dd0e1;
+  transition: all 0.3s ease;
+}
+
+.pred-item:hover, .rec-item:hover {
+  background: #252c38;
+  transform: translateX(4px);
 }
 
 .pred-item.warning {
   border-left-color: #ffb300;
+  background: rgba(255, 179, 0, 0.05);
 }
 
 .pred-item.critical {
   border-left-color: #f44336;
+  background: rgba(244, 67, 54, 0.05);
+  box-shadow: 0 0 12px rgba(244, 67, 54, 0.2);
 }
 
-.pred-item .machine-name {
-  font-weight: bold;
-  font-size: 15px;
-}
-
-.pred-item .pred-detail, .rec-item .rec-detail {
-  font-size: 13px;
-  color: #aaa;
-  margin-top: 4px;
+.pred-item.normal {
+  border-left-color: #4caf50;
 }
 
 .rec-item {
   border-left-color: #b388ff;
+}
+
+.rec-item.warning {
+  border-left-color: #ffb300;
+  background: rgba(255, 179, 0, 0.05);
+}
+
+.rec-item.critical {
+  border-left-color: #f44336;
+  background: rgba(244, 67, 54, 0.05);
+  box-shadow: 0 0 12px rgba(244, 67, 54, 0.2);
+}
+
+.pred-header, .rec-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.machine-name {
+  font-weight: bold;
+  font-size: 15px;
+}
+
+.severity-badge, .priority-label {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.severity-badge, .priority-label {
+  background: #2a2f3a;
+  color: #aaa;
+}
+
+.pred-item.critical .severity-badge,
+.rec-item.critical .priority-label {
+  background: #f44336;
+  color: #fff;
+}
+
+.pred-item.warning .severity-badge,
+.rec-item.warning .priority-label {
+  background: #ffb300;
+  color: #000;
+}
+
+.pred-item.normal .severity-badge {
+  background: #4caf50;
+  color: #fff;
+}
+
+.pred-detail, .rec-detail {
+  font-size: 13px;
+  color: #aaa;
+  line-height: 1.4;
+}
+
+/* Last update indicator */
+#last-update {
+  display: inline-block;
+  font-size: 12px;
+  color: #4dd0e1;
+  transition: opacity 0.6s ease;
+  animation: pulse 1s ease-in-out;
+}
+
+@keyframes pulse {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 0.5; }
 }
 
 /* Financial Summary */
@@ -116,6 +193,13 @@ body {
   border-radius: 8px;
   padding: 18px;
   text-align: center;
+  border: 1px solid #2a2f3a;
+  transition: all 0.3s ease;
+}
+
+.fin-box:hover {
+  border-color: #4dd0e1;
+  box-shadow: 0 0 10px rgba(77, 208, 225, 0.2);
 }
 
 .fin-box .value {
